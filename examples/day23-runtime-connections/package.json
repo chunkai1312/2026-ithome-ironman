@@ -1,0 +1,22 @@
+{
+  "name": "day23-runtime-connections",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Day 23 GitHub Copilot Runtime 連線方式範例",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^1.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3"
+  }
+}

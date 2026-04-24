@@ -1,0 +1,168 @@
+import { SpanStatusCode, type Span } from "@opentelemetry/api";
+import {
+  cancelRun,
+  completeRun,
+  failRun,
+  getRun,
+  isTerminalRunStatus,
+  publishRunEvent,
+  setRunOutput,
+  setRuntimeMessageId,
+} from "./run-store.js";
+import { getRuntimeSession } from "./runtime-pool.js";
+import { tracer } from "./telemetry.js";
+import type {
+  ApplicationRun,
+  ApplicationSession,
+  RunStatus,
+} from "./types.js";
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "未知的 Runtime 錯誤";
+}
+
+function finishSpan(span: Span, status: RunStatus, error?: string): void {
+  span.setAttribute("app.run.status", status);
+
+  if (status === "completed") {
+    span.setStatus({ code: SpanStatusCode.OK });
+  }
+
+  if (status === "failed") {
+    span.setStatus({ code: SpanStatusCode.ERROR, message: error });
+
+    if (error) {
+      span.recordException(new Error(error));
+    }
+  }
+
+  span.end();
+}
+
+export async function startRun(
+  run: ApplicationRun,
+  session: ApplicationSession,
+): Promise<void> {
+  const queueWaitMs =
+    run.startedAt === undefined
+      ? undefined
+      : Date.parse(run.startedAt) - Date.parse(run.createdAt);
+
+  await tracer.startActiveSpan(
+    "application.run",
+    {
+      attributes: {
+        "app.run.id": run.id,
+        "app.session.id": run.sessionId,
+        "app.worker.id": run.workerId ?? "unknown",
+        "runtime.id": session.runtimeId,
+        ...(queueWaitMs === undefined
+          ? {}
+          : { "app.run.queue_wait_ms": queueWaitMs }),
+      },
+    },
+    async (span) => {
+      let unsubscribe = () => {};
+      let spanEnded = false;
+
+      const endSpan = (status: RunStatus, error?: string) => {
+        if (spanEnded) return;
+
+        spanEnded = true;
+        finishSpan(span, status, error);
+      };
+
+      try {
+        const runtimeSession = await getRuntimeSession(session);
+
+        unsubscribe = runtimeSession.on((event) => {
+          switch (event.type) {
+            case "assistant.message_delta":
+              if (!event.agentId && event.data.deltaContent) {
+                publishRunEvent(run.id, {
+                  type: "run.output.delta",
+                  delta: event.data.deltaContent,
+                });
+              }
+              break;
+
+            case "assistant.message":
+              if (!event.agentId && event.data.content) {
+                setRunOutput(run.id, event.data.content);
+              }
+              break;
+
+            case "session.error": {
+              const failed = failRun(run.id, event.data.message);
+
+              if (failed?.status === "failed") {
+                publishRunEvent(run.id, {
+                  type: "run.failed",
+                  error: event.data.message,
+                });
+                endSpan("failed", event.data.message);
+              }
+
+              unsubscribe();
+              break;
+            }
+
+            case "session.idle": {
+              const current = getRun(run.id);
+
+              if (!current || isTerminalRunStatus(current.status)) {
+                unsubscribe();
+                break;
+              }
+
+              if (event.data.aborted) {
+                const cancelled = cancelRun(run.id);
+
+                if (cancelled) {
+                  publishRunEvent(run.id, { type: "run.cancelled" });
+                  endSpan("cancelled");
+                }
+              } else {
+                const completed = completeRun(run.id);
+
+                if (completed) {
+                  publishRunEvent(run.id, {
+                    type: "run.completed",
+                    output: completed.output,
+                  });
+                  endSpan("completed");
+                }
+              }
+
+              unsubscribe();
+              break;
+            }
+          }
+        });
+
+        publishRunEvent(run.id, { type: "run.started" });
+
+        const runtimeMessageId = await runtimeSession.send({
+          prompt: run.prompt,
+        });
+
+        setRuntimeMessageId(run.id, runtimeMessageId);
+      } catch (error) {
+        unsubscribe();
+
+        const message = getErrorMessage(error);
+        const failed = failRun(run.id, message);
+
+        if (failed) {
+          publishRunEvent(run.id, {
+            type: "run.failed",
+            error: message,
+          });
+        }
+
+        endSpan("failed", message);
+        throw error;
+      }
+    },
+  );
+}

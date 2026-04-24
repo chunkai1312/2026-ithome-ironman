@@ -1,0 +1,24 @@
+{
+  "name": "day12-user-interaction",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Day 12 GitHub Copilot SDK 使用者互動範例",
+  "scripts": {
+    "start": "tsx src/ask-user.ts",
+    "start:ask-user": "tsx src/ask-user.ts",
+    "start:elicitation": "tsx src/elicitation.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^1.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3"
+  }
+}

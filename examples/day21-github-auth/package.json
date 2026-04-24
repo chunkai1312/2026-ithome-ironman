@@ -1,0 +1,24 @@
+{
+  "name": "day21-github-auth",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Day 21 GitHub Copilot SDK GitHub 認證範例",
+  "scripts": {
+    "user-token": "tsx src/user-token.ts",
+    "actions": "tsx src/actions.ts",
+    "github-app": "tsx src/github-app.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^1.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3"
+  }
+}

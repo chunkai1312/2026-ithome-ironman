@@ -1,0 +1,22 @@
+{
+  "name": "2026-ithome-ironman",
+  "version": "1.0.0",
+  "private": true,
+  "description": "",
+  "main": "index.js",
+  "workspaces": [
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "honkit build",
+    "dev": "honkit serve",
+    "help": "honkit --help"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "honkit": "^6.2.2",
+    "honkit-plugin-mermaid-md-adoc": "^0.0.8"
+  }
+}
